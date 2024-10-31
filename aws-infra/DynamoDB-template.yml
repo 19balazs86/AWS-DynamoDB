@@ -1,0 +1,26 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Resources:
+  # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-dynamodb-table.html
+  DynamoDBTable:
+    Type: 'AWS::DynamoDB::Table'
+    Properties:
+      TableName: PlayingWithDynamoDB
+      AttributeDefinitions:
+        -
+          AttributeName: pk
+          AttributeType: S
+        -
+          AttributeName: sk
+          AttributeType: S
+      KeySchema:
+        -
+          AttributeName: pk
+          KeyType: HASH
+        -
+          AttributeName: sk
+          KeyType: RANGE
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+      BillingMode: PROVISIONED
