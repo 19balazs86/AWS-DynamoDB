@@ -38,11 +38,7 @@ public class GenericRepository<TEntity>(IAmazonDynamoDB _dynamoDb) : IGenericRep
 
     public async Task<TEntity?> GetItem(string partitionKey, string sortKey)
     {
-        var keyAttributeValues = new Dictionary<string, AttributeValue>
-        {
-            { "pk", new AttributeValue(partitionKey) },
-            { "sk", new AttributeValue(sortKey) }
-        };
+        Dictionary<string, AttributeValue> keyAttributeValues = getPkSkAttributeValues(partitionKey, sortKey);
 
         var getItemRequest = new GetItemRequest(TEntity.TableName, keyAttributeValues);
 
@@ -151,22 +147,25 @@ public class GenericRepository<TEntity>(IAmazonDynamoDB _dynamoDb) : IGenericRep
 
     public async Task<bool> DeleteItem(string partitionKey, string sortKey)
     {
+        Dictionary<string, AttributeValue> keyAttributeValues = getPkSkAttributeValues(partitionKey, sortKey);
+
+        var deletedItemRequest = new DeleteItemRequest(TEntity.TableName, keyAttributeValues);
+
+        DeleteItemResponse response = await _dynamoDb.DeleteItemAsync(deletedItemRequest);
+
+        // Without a ConditionExpression, the response is OK, even if there was no entity to delete
+        return response.HttpStatusCode == HttpStatusCode.OK;
+    }
+
+    protected static Dictionary<string, AttributeValue> getPkSkAttributeValues(string partitionKey, string sortKey)
+    {
         var keyAttributeValues = new Dictionary<string, AttributeValue>
         {
             { "pk", new AttributeValue(partitionKey) },
             { "sk", new AttributeValue(sortKey) }
         };
 
-        var deletedItemRequest = new DeleteItemRequest
-        {
-            TableName = TEntity.TableName,
-            Key       = keyAttributeValues
-        };
-
-        DeleteItemResponse response = await _dynamoDb.DeleteItemAsync(deletedItemRequest);
-
-        // Without a ConditionExpression, the response is OK, even if there was no entity to delete
-        return response.HttpStatusCode == HttpStatusCode.OK;
+        return keyAttributeValues;
     }
 
     protected static Dictionary<string, AttributeValue> entityToAttributeValues(TEntity entity)
