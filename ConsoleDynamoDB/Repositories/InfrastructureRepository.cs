@@ -6,6 +6,11 @@ namespace ConsoleDynamoDB.Repositories;
 
 public sealed class InfrastructureRepository(IAmazonDynamoDB _dynamoDb)
 {
+    public static string GetLocalSecondaryIndexName<TEntity>() where TEntity : IEntity
+    {
+        return $"{TEntity.TableName}_pk_lsi";
+    }
+
     public async Task<bool> IsTableExists<TEntity>() where TEntity : IEntity
     {
         ListTablesResponse listTablesResponse = await _dynamoDb.ListTablesAsync();
@@ -30,8 +35,8 @@ public sealed class InfrastructureRepository(IAmazonDynamoDB _dynamoDb)
             new("pk", ScalarAttributeType.S),
             new("sk", ScalarAttributeType.S),
 
-            // ID is used in the LocalSecondaryIndex, so it needs to be included, otherwise, the pk and sk would suffice
-            new(nameof(IEntity.Id), ScalarAttributeType.S)
+            // 'pk' and 'sk' would be sufficient, but 'lsi' is used in the LocalSecondaryIndex, so it also needs to be included
+            new("lsi", ScalarAttributeType.S)
         ];
 
         List<KeySchemaElement> keySchemaElements = [new("pk", KeyType.HASH), new("sk", KeyType.RANGE)];
@@ -57,13 +62,11 @@ public sealed class InfrastructureRepository(IAmazonDynamoDB _dynamoDb)
 
     private static List<LocalSecondaryIndex> getLocalSecondaryIndexes<TEntity>() where TEntity : IEntity
     {
-        // The BlogPost and Comment entities have a composite sort key that combines the UserId and the entity's own ID
-        // Adding a LocalSecondaryIndex enables queries using by pk and ID
-        List<KeySchemaElement> keySchemaElements = [new("pk", KeyType.HASH), new(nameof(IEntity.Id), KeyType.RANGE)];
+        List<KeySchemaElement> keySchemaElements = [new("pk", KeyType.HASH), new("lsi", KeyType.RANGE)];
 
         var localSecondaryIndex = new LocalSecondaryIndex
         {
-            IndexName  = $"{TEntity.TableName}_pk_Id",
+            IndexName  = GetLocalSecondaryIndexName<TEntity>(),
             KeySchema  = keySchemaElements,
             Projection = new Projection { ProjectionType = ProjectionType.ALL }
         };

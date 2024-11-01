@@ -6,11 +6,9 @@ public sealed class BlogPost : IEntity
 {
     public static string TableName => "BlogPosts";
 
-    [JsonPropertyName("pk")]
-    public string Pk => TenantId.ToString();
-
-    [JsonPropertyName("sk")]
-    public string Sk => $"{UserId}#{Id}"; // Composite key: UserId#PostId
+    [JsonPropertyName("pk")]  public string Pk  => TenantId.ToString();
+    [JsonPropertyName("sk")]  public string Sk  => Id.ToString();
+    [JsonPropertyName("lsi")] public string Lsi => UserId.ToString();
 
     public Guid   Id      { get; init; }
     public string Title   { get; set; } = string.Empty;
@@ -23,7 +21,7 @@ public sealed class BlogPost : IEntity
 
 public sealed class Rating
 {
-    public int Sum   { get; set; }
-    public int Count { get; set; }
-    public int Avg   { get; set; }
+    public int    Sum   { get; set; }
+    public int    Count { get; set; }
+    public double Avg   { get; set; }
 }

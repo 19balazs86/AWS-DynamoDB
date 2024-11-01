@@ -6,11 +6,9 @@ public sealed class Comment : IEntity
 {
     public static string TableName => "Comments";
 
-    [JsonPropertyName("pk")]
-    public string Pk => BlogPostId.ToString();
-
-    [JsonPropertyName("sk")]
-    public string Sk => $"{UserId}#{Id}"; // Composite key: UserId#CommentId
+    [JsonPropertyName("pk")]  public string Pk  => BlogPostId.ToString();
+    [JsonPropertyName("sk")]  public string Sk  => Id.ToString();
+    [JsonPropertyName("lsi")] public string Lsi => UserId.ToString();
 
     public Guid   Id   { get; init; }
     public string Text { get; set; } = string.Empty;
