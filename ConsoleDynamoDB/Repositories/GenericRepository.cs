@@ -70,8 +70,32 @@ public class GenericRepository<TEntity>(IAmazonDynamoDB _dynamoDb) : IGenericRep
         return response.Items.Select(attributeValueToEntity).ToArray()!;
     }
 
+    public async Task<TEntity[]> GetItems(string partitionKey, string lsiKey)
+    {
+        var expressionAttributeValues = new Dictionary<string, AttributeValue>
+        {
+            { ":v_Pk",  new AttributeValue(partitionKey) },
+            { ":v_lsi", new AttributeValue(lsiKey) }
+        };
+
+        var queryRequest = new QueryRequest
+        {
+            TableName                 = TEntity.TableName,
+            IndexName                 = InfrastructureRepository.GetLocalSecondaryIndexName<TEntity>(),
+            KeyConditionExpression    = "pk = :v_Pk and lsi = :v_lsi",
+            ExpressionAttributeValues = expressionAttributeValues
+        };
+
+        QueryResponse response = await _dynamoDb.QueryAsync(queryRequest);
+
+        return response.Items.Select(attributeValueToEntity).ToArray()!;
+    }
+
     public async Task<TEntity[]> GetItemsBySortKeyPrefix(string partitionKey, string sortKeyPrefix)
     {
+        // You can create a sort key similar to a composite key, such as UserId#BlogPostId or UserId#CommentId
+        // Then, you can use the begins_with expression to filter the sort key by UserId
+
         var expressionAttributeValues = new Dictionary<string, AttributeValue>
         {
             { ":pk",       new AttributeValue(partitionKey) },

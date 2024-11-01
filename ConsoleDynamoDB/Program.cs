@@ -17,13 +17,15 @@ public static class Program
 
         List<(Guid TenantId,   Guid[] UserIds)>                  users     = await createUsers(dynamoDb, tenantIds);
         List<(Guid TenantId,   Guid UserId, Guid[] BlogPostIds)> blogPosts = await createBlogPosts(dynamoDb, users);
-        List<(Guid BlogPostId, string UserId_CommentId)>         comments  = await createComments(dynamoDb, tenantIds);
+        List<(Guid BlogPostId, Guid UserId, Guid[] CommentIds)>  comments  = await createComments(dynamoDb, tenantIds);
 
         await updateBlogPostsByUserIds(dynamoDb, users);
 
+        List<(Guid UserId, BlogPost[] BlogPosts)> userBlogPosts = await getBlogPostsUsingIndex(dynamoDb, users[0].TenantId, users.SelectMany(x => x.UserIds).ToArray());
+
         Guid[] randomBlogPostIds = Random.Shared.GetItems(blogPosts[0].BlogPostIds, 5);
 
-        List<BlogPost> blogPostsByIndex = await getBlogPostsUsingIndex(dynamoDb, blogPosts[0].TenantId, randomBlogPostIds);
+        List<(Guid BlogPostId, Rating Rating)> blogPostRatings = await getBlogPostRatings(dynamoDb, blogPosts[0].TenantId, randomBlogPostIds);
     }
 
     private static async Task<List<(Guid TenantId, Guid[] UserIds)>> createUsers(IAmazonDynamoDB dynamoDb, Guid[] tenantIds)
@@ -76,7 +78,8 @@ public static class Program
                         TenantId = tenantId,
                         UserId   = userId,
                         Title    = $"Title #{blogPostId.ToString()[..5]}",
-                        Content  = $"Content #{blogPostId.ToString()[..5]}"
+                        Content  = $"Content #{blogPostId.ToString()[..5]}",
+                        Rating   = new Rating { Avg = 4.5, Count = 2, Sum = 9 }
                     };
 
                     await blogPostRepository.CreateItem(blogPost);
@@ -87,9 +90,9 @@ public static class Program
         return blogPosts;
     }
 
-    private static async Task<List<(Guid BlogPostId, string UserId_CommentId)>> createComments(IAmazonDynamoDB dynamoDb, Guid[] tenantIds)
+    private static async Task<List<(Guid BlogPostId, Guid UserId, Guid[] CommentIds)>> createComments(IAmazonDynamoDB dynamoDb, Guid[] tenantIds)
     {
-        List<(Guid BlogPostId, string UserId_CommentId)> comments = [];
+        List<(Guid BlogPostId, Guid UserId, Guid[] CommentIds)> comments = [];
 
         var blogPostRepository = new GenericRepository<BlogPost>(dynamoDb);
         var commentRepository  = new GenericRepository<Comment>(dynamoDb);
@@ -102,6 +105,8 @@ public static class Program
             {
                 Guid[] commentIds = [Guid.NewGuid(), Guid.NewGuid()];
 
+                comments.Add((blogPost.Id, blogPost.UserId, commentIds));
+
                 foreach (Guid commentId in commentIds)
                 {
                     var comment = new Comment
@@ -113,8 +118,6 @@ public static class Program
                     };
 
                     await commentRepository.CreateItem(comment);
-
-                    comments.Add((blogPost.Id, comment.Sk));
                 }
             }
         }
@@ -143,19 +146,35 @@ public static class Program
         }
     }
 
-    private static async Task<List<BlogPost>> getBlogPostsUsingIndex(IAmazonDynamoDB dynamoDb, Guid tenantId, Guid[] blogPostIds)
+    private static async Task<List<(Guid UserId, BlogPost[] BlogPosts)>> getBlogPostsUsingIndex(IAmazonDynamoDB dynamoDb, Guid tenantId, Guid[] userIds)
+    {
+        var blogPostRepository = new GenericRepository<BlogPost>(dynamoDb);
+
+        List<(Guid UserId, BlogPost[] BlogPosts)> userBlogPosts = [];
+
+        foreach (Guid userId in userIds)
+        {
+            BlogPost[] blogPosts = await blogPostRepository.GetItems(tenantId.ToString(), userId.ToString());
+
+            userBlogPosts.Add((userId, blogPosts));
+        }
+
+        return userBlogPosts;
+    }
+
+    private static async Task<List<(Guid BlogPostId, Rating Rating)>> getBlogPostRatings(IAmazonDynamoDB dynamoDb, Guid tenantId, Guid[] blogPostIds)
     {
         var blogPostRepository = new BlogPostRepository(dynamoDb);
 
-        List<BlogPost> blogPosts = [];
+        List<(Guid BlogPostId, Rating Rating)> blogPosts = [];
 
         foreach (Guid blogPostId in blogPostIds)
         {
-            BlogPost? blogPost = await blogPostRepository.GetBlogPost(tenantId, blogPostId);
+            Rating? rating = await blogPostRepository.GetRatingByProjection(tenantId, blogPostId);
 
-            if (blogPost is not null)
+            if (rating is not null)
             {
-                blogPosts.Add(blogPost);
+                blogPosts.Add((blogPostId, rating));
             }
         }
 

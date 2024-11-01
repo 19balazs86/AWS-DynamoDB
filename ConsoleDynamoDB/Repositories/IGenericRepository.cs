@@ -10,6 +10,8 @@ public interface IGenericRepository<TEntity> where TEntity : IEntity
 
     Task<TEntity[]> GetItems(string partitionKey);
 
+    Task<TEntity[]> GetItems(string partitionKey, string lsiKey);
+
     Task<TEntity[]> GetItemsBySortKeyPrefix(string partitionKey, string sortKeyPrefix);
 
     Task<TEntity[]> GetAllAsync();
