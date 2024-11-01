@@ -110,7 +110,7 @@ public class GenericRepository<TEntity>(IAmazonDynamoDB _dynamoDb) : IGenericRep
         return response.Items.Select(attributeValueToEntity).ToArray()!;
     }
 
-    public async Task<TEntity[]> GetAllAsync()
+    public async Task<TEntity[]> GetAllByScan()
     {
         // The scan operation is not recommended because it requires a large amount of resources due to the nature of scanning all partitions
         var scanRequest = new ScanRequest(TEntity.TableName);

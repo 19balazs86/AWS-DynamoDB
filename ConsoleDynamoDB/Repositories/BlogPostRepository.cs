@@ -62,13 +62,7 @@ public sealed class BlogPostRepository(IAmazonDynamoDB _dynamoDb) : GenericRepos
             return null;
         }
 
-        var newRating = new Rating
-        {
-            Sum   = oldRating.Sum   + rating,
-            Count = oldRating.Count + 1
-        };
-
-        newRating.Avg = newRating.Sum / (double) newRating.Count;
+        Rating newRating = oldRating.CreateNewWith(rating);
 
         Dictionary<string, AttributeValue> keyAttributeValues = getPkSkAttributeValues(tenantId.ToString(), blogPostId.ToString());
 

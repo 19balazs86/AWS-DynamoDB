@@ -14,7 +14,7 @@ public interface IGenericRepository<TEntity> where TEntity : IEntity
 
     Task<TEntity[]> GetItemsBySortKeyPrefix(string partitionKey, string sortKeyPrefix);
 
-    Task<TEntity[]> GetAllAsync();
+    Task<TEntity[]> GetAllByScan();
 
     Task<bool> UpdateItem(TEntity entity);
 

@@ -24,4 +24,17 @@ public sealed class Rating
     public int    Sum   { get; set; }
     public int    Count { get; set; }
     public double Avg   { get; set; }
+
+    public Rating CreateNewWith(int rating)
+    {
+        var newRating = new Rating
+        {
+            Sum   = Sum   + rating,
+            Count = Count + 1
+        };
+
+        newRating.Avg = newRating.Sum / (double) newRating.Count;
+
+        return newRating;
+    }
 }
