@@ -15,11 +15,15 @@ public static class Program
 
         Guid[] tenantIds = [Guid.NewGuid(), Guid.NewGuid()];
 
-        List<(Guid TenantId,   Guid[] UserIds)>          users     = await createUsers(dynamoDb, tenantIds);
-        List<(Guid TenantId,   string UserId_PostId)>    blogPosts = await createBlogPosts(dynamoDb, users);
-        List<(Guid BlogPostId, string UserId_CommentId)> comments  = await createComments(dynamoDb, tenantIds);
+        List<(Guid TenantId,   Guid[] UserIds)>                  users     = await createUsers(dynamoDb, tenantIds);
+        List<(Guid TenantId,   Guid UserId, Guid[] BlogPostIds)> blogPosts = await createBlogPosts(dynamoDb, users);
+        List<(Guid BlogPostId, string UserId_CommentId)>         comments  = await createComments(dynamoDb, tenantIds);
 
         await updateBlogPostsByUserIds(dynamoDb, users);
+
+        Guid[] randomBlogPostIds = Random.Shared.GetItems(blogPosts[0].BlogPostIds, 5);
+
+        List<BlogPost> blogPostsByIndex = await getBlogPostsUsingIndex(dynamoDb, blogPosts[0].TenantId, randomBlogPostIds);
     }
 
     private static async Task<List<(Guid TenantId, Guid[] UserIds)>> createUsers(IAmazonDynamoDB dynamoDb, Guid[] tenantIds)
@@ -50,9 +54,9 @@ public static class Program
         return users;
     }
 
-    private static async Task<List<(Guid TenantId, string UserId_PostId)>> createBlogPosts(IAmazonDynamoDB dynamoDb, List<(Guid TenantId, Guid[] UserIds)> users)
+    private static async Task<List<(Guid TenantId, Guid UserId, Guid[] BlogPostIds)>> createBlogPosts(IAmazonDynamoDB dynamoDb, List<(Guid TenantId, Guid[] UserIds)> users)
     {
-        List<(Guid TenantId, string UserId_PostId)> blogPosts = [];
+        List<(Guid TenantId, Guid UserId, Guid[] BlogPostIds)> blogPosts = [];
 
         var blogPostRepository = new GenericRepository<BlogPost>(dynamoDb);
 
@@ -61,6 +65,8 @@ public static class Program
             foreach (Guid userId in userIds)
             {
                 Guid[] blogPostIds = [Guid.NewGuid(), Guid.NewGuid()];
+
+                blogPosts.Add((tenantId, userId, blogPostIds));
 
                 foreach (Guid blogPostId in blogPostIds)
                 {
@@ -74,8 +80,6 @@ public static class Program
                     };
 
                     await blogPostRepository.CreateItem(blogPost);
-
-                    blogPosts.Add((tenantId, blogPost.Sk));
                 }
             }
         }
@@ -139,12 +143,31 @@ public static class Program
         }
     }
 
+    private static async Task<List<BlogPost>> getBlogPostsUsingIndex(IAmazonDynamoDB dynamoDb, Guid tenantId, Guid[] blogPostIds)
+    {
+        var blogPostRepository = new BlogPostRepository(dynamoDb);
+
+        List<BlogPost> blogPosts = [];
+
+        foreach (Guid blogPostId in blogPostIds)
+        {
+            BlogPost? blogPost = await blogPostRepository.GetBlogPost(tenantId, blogPostId);
+
+            if (blogPost is not null)
+            {
+                blogPosts.Add(blogPost);
+            }
+        }
+
+        return blogPosts;
+    }
+
     private static async Task ensureTablesExists(IAmazonDynamoDB dynamoDb)
     {
         var repository = new InfrastructureRepository(dynamoDb);
 
-        await repository.EnsureTableExists<User>();
-        await repository.EnsureTableExists<BlogPost>();
-        await repository.EnsureTableExists<Comment>();
+        await repository.EnsureTableCreated<User>();
+        await repository.EnsureTableCreated<BlogPost>();
+        await repository.EnsureTableCreated<Comment>();
     }
 }

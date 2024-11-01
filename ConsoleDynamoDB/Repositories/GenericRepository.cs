@@ -9,6 +9,8 @@ namespace ConsoleDynamoDB.Repositories;
 
 public class GenericRepository<TEntity>(IAmazonDynamoDB _dynamoDb) : IGenericRepository<TEntity> where TEntity : IEntity
 {
+    protected readonly IAmazonDynamoDB _dynamoDb = _dynamoDb;
+
     public async Task<bool> CreateItem(TEntity entity)
     {
         Dictionary<string, AttributeValue> entityAttributeMap = entityToAttributeValues(entity);
@@ -143,14 +145,14 @@ public class GenericRepository<TEntity>(IAmazonDynamoDB _dynamoDb) : IGenericRep
         return response.HttpStatusCode == HttpStatusCode.OK;
     }
 
-    private static Dictionary<string, AttributeValue> entityToAttributeValues(TEntity entity)
+    protected static Dictionary<string, AttributeValue> entityToAttributeValues(TEntity entity)
     {
         string serializedEntity = JsonSerializer.Serialize(entity);
 
         return Document.FromJson(serializedEntity).ToAttributeMap();
     }
 
-    private static TEntity? attributeValueToEntity(Dictionary<string, AttributeValue>? attributeValues)
+    protected static TEntity? attributeValueToEntity(Dictionary<string, AttributeValue>? attributeValues)
     {
         if (attributeValues is null || attributeValues.Count == 0)
         {
