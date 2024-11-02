@@ -93,6 +93,7 @@ public sealed class BlogPostRepository(IAmazonDynamoDB _dynamoDb) : GenericRepos
 
     // I can not use this ProjectionExpression = "Rating.Sum, Rating.Count, Rating.Avg"
     // AmazonDynamoDBException: Invalid ProjectionExpression: Attribute names are reserved keywords: Sum, Count, Avg
+    // https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/ReservedWords.html
     private static readonly Dictionary<string, string> _ratingExpressionAttributeNames = new()
     {
         ["#sum"]   = nameof(Rating.Sum),
