@@ -8,25 +8,18 @@ namespace ConsoleDynamoDB.Repositories;
 
 public interface IBlogPostRepository : IGenericRepository<BlogPost>
 {
-    Task<Rating?> GetRatingByProjection(Guid tenantId, Guid blogPostId);
+    Task<Rating?> GetRating(Guid tenantId, Guid blogPostId);
 
-    Task<Rating?> StarRating(Guid tenantId, Guid blogPostId, int rating);
+    Task<Rating?> AddRating(Guid tenantId, Guid blogPostId, int rating);
 }
 
 public sealed class BlogPostRepository(IAmazonDynamoDB _dynamoDb) : GenericRepository<BlogPost>(_dynamoDb), IBlogPostRepository
 {
-    // AmazonDynamoDBException: Invalid ProjectionExpression: Attribute names are reserved keywords: Sum, Count, Avg
-    // ProjectionExpression = "Rating.Sum, Rating.Count, Rating.Avg" -- I can not use it
-    private static readonly Dictionary<string, string> _ratingExpressionAttributeNames = new()
-    {
-        ["#sum"]   = "Sum",
-        ["#count"] = "Count",
-        ["#avg"]   = "Avg"
-    };
+    // This method uses projection to return only a portion of the document
 
-    public async Task<Rating?> GetRatingByProjection(Guid tenantId, Guid blogPostId)
+    public async Task<Rating?> GetRating(Guid tenantId, Guid blogPostId)
     {
-        Dictionary<string, AttributeValue> keyAttributeValues = getPkSkAttributeValues(tenantId.ToString(), blogPostId.ToString());
+        Dictionary<string, AttributeValue> keyAttributeValues = getPkSkAttributeValues(tenantId, blogPostId);
 
         var getItemRequest = new GetItemRequest(BlogPost.TableName, keyAttributeValues)
         {
@@ -53,9 +46,11 @@ public sealed class BlogPostRepository(IAmazonDynamoDB _dynamoDb) : GenericRepos
         };
     }
 
-    public async Task<Rating?> StarRating(Guid tenantId, Guid blogPostId, int rating)
+    // This method uses an UpdateExpression to update only part of the document
+
+    public async Task<Rating?> AddRating(Guid tenantId, Guid blogPostId, int rating)
     {
-        Rating? oldRating = await GetRatingByProjection(tenantId, blogPostId);
+        Rating? oldRating = await GetRating(tenantId, blogPostId);
 
         if (oldRating is null)
         {
@@ -64,7 +59,7 @@ public sealed class BlogPostRepository(IAmazonDynamoDB _dynamoDb) : GenericRepos
 
         Rating newRating = oldRating.CreateNewWith(rating);
 
-        Dictionary<string, AttributeValue> keyAttributeValues = getPkSkAttributeValues(tenantId.ToString(), blogPostId.ToString());
+        Dictionary<string, AttributeValue> keyAttributeValues = getPkSkAttributeValues(tenantId, blogPostId);
 
         var culture = new CultureInfo("en-US");
 
@@ -95,4 +90,13 @@ public sealed class BlogPostRepository(IAmazonDynamoDB _dynamoDb) : GenericRepos
 
         return newRating;
     }
+
+    // I can not use this ProjectionExpression = "Rating.Sum, Rating.Count, Rating.Avg"
+    // AmazonDynamoDBException: Invalid ProjectionExpression: Attribute names are reserved keywords: Sum, Count, Avg
+    private static readonly Dictionary<string, string> _ratingExpressionAttributeNames = new()
+    {
+        ["#sum"]   = nameof(Rating.Sum),
+        ["#count"] = nameof(Rating.Count),
+        ["#avg"]   = nameof(Rating.Avg)
+    };
 }

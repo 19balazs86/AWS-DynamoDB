@@ -11,7 +11,7 @@ public class GenericRepository<TEntity>(IAmazonDynamoDB _dynamoDb) : IGenericRep
 {
     protected readonly IAmazonDynamoDB _dynamoDb = _dynamoDb;
 
-    public async Task<bool> CreateItem(TEntity entity)
+    public async Task<bool> AddItem(TEntity entity)
     {
         Dictionary<string, AttributeValue> entityAttributeMap = entityToAttributeValues(entity);
 
@@ -36,7 +36,7 @@ public class GenericRepository<TEntity>(IAmazonDynamoDB _dynamoDb) : IGenericRep
         }
     }
 
-    public async Task<TEntity?> GetItem(string partitionKey, string sortKey)
+    public async Task<TEntity?> GetItemById(string partitionKey, string sortKey)
     {
         Dictionary<string, AttributeValue> keyAttributeValues = getPkSkAttributeValues(partitionKey, sortKey);
 
@@ -47,7 +47,7 @@ public class GenericRepository<TEntity>(IAmazonDynamoDB _dynamoDb) : IGenericRep
         return attributeValueToEntity(response.Item);
     }
 
-    public async Task<TEntity[]> GetItems(string partitionKey)
+    public async Task<TEntity[]> GetItemsByPartition(string partitionKey)
     {
         var expressionAttributeValues = new Dictionary<string, AttributeValue>
         {
@@ -66,7 +66,7 @@ public class GenericRepository<TEntity>(IAmazonDynamoDB _dynamoDb) : IGenericRep
         return response.Items.Select(attributeValueToEntity).ToArray()!;
     }
 
-    public async Task<TEntity[]> GetItems(string partitionKey, string lsiKey)
+    public async Task<TEntity[]> GetItemsUsingIndex(string partitionKey, string lsiKey)
     {
         var expressionAttributeValues = new Dictionary<string, AttributeValue>
         {
@@ -110,7 +110,7 @@ public class GenericRepository<TEntity>(IAmazonDynamoDB _dynamoDb) : IGenericRep
         return response.Items.Select(attributeValueToEntity).ToArray()!;
     }
 
-    public async Task<TEntity[]> GetAllByScan()
+    public async Task<TEntity[]> GetItemsByScaning()
     {
         // The scan operation is not recommended because it requires a large amount of resources due to the nature of scanning all partitions
         var scanRequest = new ScanRequest(TEntity.TableName);
@@ -155,6 +155,11 @@ public class GenericRepository<TEntity>(IAmazonDynamoDB _dynamoDb) : IGenericRep
 
         // Without a ConditionExpression, the response is OK, even if there was no entity to delete
         return response.HttpStatusCode == HttpStatusCode.OK;
+    }
+
+    protected static Dictionary<string, AttributeValue> getPkSkAttributeValues(Guid partitionKey, Guid sortKey)
+    {
+        return getPkSkAttributeValues(partitionKey.ToString(), sortKey.ToString());
     }
 
     protected static Dictionary<string, AttributeValue> getPkSkAttributeValues(string partitionKey, string sortKey)

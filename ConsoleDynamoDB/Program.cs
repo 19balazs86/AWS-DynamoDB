@@ -51,7 +51,7 @@ public static class Program
                     Name     = $"John Doe #{usersId.ToString()[..5]}"
                 };
 
-                await userRepository.CreateItem(user);
+                await userRepository.AddItem(user);
             }
         }
 
@@ -84,7 +84,7 @@ public static class Program
                         Rating   = new Rating { Avg = 4.5, Count = 2, Sum = 9 }
                     };
 
-                    await blogPostRepository.CreateItem(blogPost);
+                    await blogPostRepository.AddItem(blogPost);
                 }
             }
         }
@@ -101,7 +101,7 @@ public static class Program
 
         foreach (Guid tenantId in tenantIds)
         {
-            BlogPost[] blogPosts = await blogPostRepository.GetItems(tenantId.ToString());
+            BlogPost[] blogPosts = await blogPostRepository.GetItemsByPartition(tenantId.ToString());
 
             foreach (BlogPost blogPost in blogPosts)
             {
@@ -119,7 +119,7 @@ public static class Program
                         Text       = $"Content #{commentId.ToString()[..5]}"
                     };
 
-                    await commentRepository.CreateItem(comment);
+                    await commentRepository.AddItem(comment);
                 }
             }
         }
@@ -156,7 +156,7 @@ public static class Program
 
         foreach (Guid userId in userIds)
         {
-            BlogPost[] blogPosts = await blogPostRepository.GetItems(tenantId.ToString(), userId.ToString());
+            BlogPost[] blogPosts = await blogPostRepository.GetItemsUsingIndex(tenantId.ToString(), userId.ToString());
 
             userBlogPosts.Add((userId, blogPosts));
         }
@@ -172,7 +172,7 @@ public static class Program
 
         foreach (Guid blogPostId in blogPostIds)
         {
-            Rating? rating = await blogPostRepository.GetRatingByProjection(tenantId, blogPostId);
+            Rating? rating = await blogPostRepository.GetRating(tenantId, blogPostId);
 
             if (rating is not null)
             {
@@ -187,7 +187,7 @@ public static class Program
     {
         var blogPostRepository = new BlogPostRepository(dynamoDb);
 
-        return await blogPostRepository.StarRating(tenantId, blogPostId, Random.Shared.Next(1, 6));
+        return await blogPostRepository.AddRating(tenantId, blogPostId, Random.Shared.Next(1, 6));
     }
 
     private static async Task ensureTablesExists(IAmazonDynamoDB dynamoDb)
