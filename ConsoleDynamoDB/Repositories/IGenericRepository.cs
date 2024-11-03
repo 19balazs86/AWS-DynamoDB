@@ -19,4 +19,6 @@ public interface IGenericRepository<TEntity> where TEntity : IEntity
     Task<bool> UpdateItem(TEntity entity);
 
     Task<bool> DeleteItem(string partitionKey, string sortKey);
+
+    Task<int> CountItems(string partitionKey);
 }

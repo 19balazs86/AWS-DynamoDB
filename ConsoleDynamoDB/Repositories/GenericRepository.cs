@@ -51,13 +51,13 @@ public class GenericRepository<TEntity>(IAmazonDynamoDB _dynamoDb) : IGenericRep
     {
         var expressionAttributeValues = new Dictionary<string, AttributeValue>
         {
-            { ":pk", new AttributeValue(partitionKey) }
+            { ":v_Pk", new AttributeValue(partitionKey) }
         };
 
         var queryRequest = new QueryRequest
         {
             TableName                 = TEntity.TableName,
-            KeyConditionExpression    = "pk = :pk",
+            KeyConditionExpression    = "pk = :v_Pk",
             ExpressionAttributeValues = expressionAttributeValues
         };
 
@@ -94,14 +94,14 @@ public class GenericRepository<TEntity>(IAmazonDynamoDB _dynamoDb) : IGenericRep
 
         var expressionAttributeValues = new Dictionary<string, AttributeValue>
         {
-            { ":pk",       new AttributeValue(partitionKey) },
-            { ":skPrefix", new AttributeValue(sortKeyPrefix) }
+            { ":v_Pk",       new AttributeValue(partitionKey) },
+            { ":v_SkPrefix", new AttributeValue(sortKeyPrefix) }
         };
 
         var queryRequest = new QueryRequest
         {
             TableName                 = TEntity.TableName,
-            KeyConditionExpression    = "pk = :pk AND begins_with(sk, :skPrefix)",
+            KeyConditionExpression    = "pk = :v_Pk AND begins_with(sk, :v_SkPrefix)",
             ExpressionAttributeValues = expressionAttributeValues
         };
 
@@ -155,6 +155,37 @@ public class GenericRepository<TEntity>(IAmazonDynamoDB _dynamoDb) : IGenericRep
 
         // Without a ConditionExpression, the response is OK, even if there was no entity to delete
         return response.HttpStatusCode == HttpStatusCode.OK;
+    }
+
+    public async Task<int> CountItems(string partitionKey)
+    {
+        var expressionAttributeValues = new Dictionary<string, AttributeValue>
+        {
+            { ":v_Pk", new AttributeValue(partitionKey) }
+        };
+
+        var queryRequest = new QueryRequest
+        {
+            TableName                 = TEntity.TableName,
+            KeyConditionExpression    = "pk = :v_Pk",
+            ExpressionAttributeValues = expressionAttributeValues,
+            Select                    = Select.COUNT, // No attributes need to be returned to minimize resource usage
+            Limit                     = 1_000         // Set a limit for pagination
+        };
+
+        int totalCount = 0;
+
+        do
+        {
+            QueryResponse queryResponse = await _dynamoDb.QueryAsync(queryRequest);
+
+            totalCount += queryResponse.Count ?? 0;
+
+            queryRequest.ExclusiveStartKey = queryResponse.LastEvaluatedKey;
+
+        } while (queryRequest.ExclusiveStartKey?.Count > 0);
+
+        return totalCount;
     }
 
     protected static Dictionary<string, AttributeValue> getPkSkAttributeValues(Guid partitionKey, Guid sortKey)

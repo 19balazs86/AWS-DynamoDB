@@ -28,6 +28,8 @@ public static class Program
         List<(Guid BlogPostId, Rating Rating)> blogPostRatings = await getBlogPostRatings(dynamoDb, blogPosts[0].TenantId, randomBlogPostIds);
 
         Rating? rating = await starRating(dynamoDb, blogPosts[0].TenantId, blogPosts[0].BlogPostIds[0]);
+
+        int blogPostCount = await getBlogPostsCount(dynamoDb, tenantIds[0]);
     }
 
     private static async Task<List<(Guid TenantId, Guid[] UserIds)>> createUsers(IAmazonDynamoDB dynamoDb, Guid[] tenantIds)
@@ -188,6 +190,13 @@ public static class Program
         var blogPostRepository = new BlogPostRepository(dynamoDb);
 
         return await blogPostRepository.AddRating(tenantId, blogPostId, Random.Shared.Next(1, 6));
+    }
+
+    private static async Task<int> getBlogPostsCount(IAmazonDynamoDB dynamoDb, Guid tenantId)
+    {
+        var blogPostRepository = new GenericRepository<BlogPost>(dynamoDb);
+
+        return await blogPostRepository.CountItems(tenantId.ToString());
     }
 
     private static async Task ensureTablesExists(IAmazonDynamoDB dynamoDb)
