@@ -30,6 +30,8 @@ public static class Program
         Rating? rating = await starRating(dynamoDb, blogPosts[0].TenantId, blogPosts[0].BlogPostIds[0]);
 
         int blogPostCount = await getBlogPostsCount(dynamoDb, tenantIds[0]);
+
+        List<(string PartitionKey, string SortKey)> commentKeys = await getCommentKeysByScaning(dynamoDb);
     }
 
     private static async Task<List<(Guid TenantId, Guid[] UserIds)>> createUsers(IAmazonDynamoDB dynamoDb, Guid[] tenantIds)
@@ -197,6 +199,13 @@ public static class Program
         var blogPostRepository = new GenericRepository<BlogPost>(dynamoDb);
 
         return await blogPostRepository.CountItems(tenantId.ToString());
+    }
+
+    private static async Task<List<(string PartitionKey, string SortKey)>> getCommentKeysByScaning(IAmazonDynamoDB dynamoDb)
+    {
+        var commentRepository = new GenericRepository<Comment>(dynamoDb);
+
+        return await commentRepository.GetKeysByScaning();
     }
 
     private static async Task ensureTablesExists(IAmazonDynamoDB dynamoDb)

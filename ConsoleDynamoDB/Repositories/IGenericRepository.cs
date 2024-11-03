@@ -16,6 +16,8 @@ public interface IGenericRepository<TEntity> where TEntity : IEntity
 
     Task<TEntity[]> GetItemsByScaning();
 
+    Task<List<(string PartitionKey, string SortKey)>> GetKeysByScaning();
+
     Task<bool> UpdateItem(TEntity entity);
 
     Task<bool> DeleteItem(string partitionKey, string sortKey);

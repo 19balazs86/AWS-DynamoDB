@@ -113,11 +113,23 @@ public class GenericRepository<TEntity>(IAmazonDynamoDB _dynamoDb) : IGenericRep
     public async Task<TEntity[]> GetItemsByScaning()
     {
         // The scan operation is not recommended because it requires a large amount of resources due to the nature of scanning all partitions
+        // TODO: Use pagination with Limit and LastEvaluatedKey as in CountItems method
         var scanRequest = new ScanRequest(TEntity.TableName);
 
         ScanResponse response = await _dynamoDb.ScanAsync(scanRequest);
 
         return response.Items.Select(attributeValueToEntity).ToArray()!;
+    }
+
+    public async Task<List<(string PartitionKey, string SortKey)>> GetKeysByScaning()
+    {
+        // The scan operation is not recommended because it requires a large amount of resources due to the nature of scanning all partitions
+        // TODO: Use pagination with Limit and LastEvaluatedKey as in CountItems method
+        var scanRequest = new ScanRequest(TEntity.TableName) { ProjectionExpression = "pk, sk" };
+
+        ScanResponse response = await _dynamoDb.ScanAsync(scanRequest);
+
+        return response.Items.Select(item => (item["pk"].S, item["sk"].S)).ToList();
     }
 
     public async Task<bool> UpdateItem(TEntity entity)
