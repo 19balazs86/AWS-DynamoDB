@@ -1,6 +1,7 @@
 ﻿using Amazon.DynamoDBv2;
 using ConsoleDynamoDB.Entities;
 using ConsoleDynamoDB.Repositories;
+using ConsoleDynamoDB.Types;
 
 namespace ConsoleDynamoDB;
 
@@ -31,7 +32,9 @@ public static class Program
 
         int blogPostCount = await getBlogPostsCount(dynamoDb, tenantIds[0]);
 
-        List<(string PartitionKey, string SortKey)> commentKeys = await getCommentKeysByScaning(dynamoDb);
+        await paginateBlogPost(dynamoDb, tenantIds[0]);
+
+        List<(string PartitionKey, string SortKey)> commentKeys = await getCommentKeysByScanning(dynamoDb);
     }
 
     private static async Task<List<(Guid TenantId, Guid[] UserIds)>> createUsers(IAmazonDynamoDB dynamoDb, Guid[] tenantIds)
@@ -201,11 +204,32 @@ public static class Program
         return await blogPostRepository.CountItems(tenantId.ToString());
     }
 
-    private static async Task<List<(string PartitionKey, string SortKey)>> getCommentKeysByScaning(IAmazonDynamoDB dynamoDb)
+    private static async Task paginateBlogPost(IAmazonDynamoDB dynamoDb, Guid tenantId)
+    {
+        var blogPostRepository = new GenericRepository<BlogPost>(dynamoDb);
+
+        var pageQuery = new PageQuery
+        {
+            PageSize          = 10,
+            PartitionKey      = tenantId.ToString(),
+            ContinuationToken = null
+        };
+
+        PageResult<BlogPost> pageResult;
+
+        do
+        {
+            pageResult = await blogPostRepository.GetPagedItems(pageQuery);
+
+            pageQuery.ContinuationToken = pageResult.ContinuationToken;
+        } while (pageResult.HasMoreItems);
+    }
+
+    private static async Task<List<(string PartitionKey, string SortKey)>> getCommentKeysByScanning(IAmazonDynamoDB dynamoDb)
     {
         var commentRepository = new GenericRepository<Comment>(dynamoDb);
 
-        return await commentRepository.GetKeysByScaning();
+        return await commentRepository.GetKeysByScanning();
     }
 
     private static async Task ensureTablesExists(IAmazonDynamoDB dynamoDb)

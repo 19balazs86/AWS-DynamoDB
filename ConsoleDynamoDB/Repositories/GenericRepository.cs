@@ -4,10 +4,11 @@ using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.DocumentModel;
 using Amazon.DynamoDBv2.Model;
 using ConsoleDynamoDB.Entities;
+using ConsoleDynamoDB.Types;
 
 namespace ConsoleDynamoDB.Repositories;
 
-public class GenericRepository<TEntity>(IAmazonDynamoDB _dynamoDb) : IGenericRepository<TEntity> where TEntity : IEntity
+public class GenericRepository<TEntity>(IAmazonDynamoDB _dynamoDb) : IGenericRepository<TEntity> where TEntity : class, IEntity
 {
     protected readonly IAmazonDynamoDB _dynamoDb = _dynamoDb;
 
@@ -44,7 +45,7 @@ public class GenericRepository<TEntity>(IAmazonDynamoDB _dynamoDb) : IGenericRep
 
         GetItemResponse response = await _dynamoDb.GetItemAsync(getItemRequest);
 
-        return attributeValueToEntity(response.Item);
+        return attributeValuesToEntity(response.Item);
     }
 
     public async Task<TEntity[]> GetItemsByPartition(string partitionKey)
@@ -63,7 +64,41 @@ public class GenericRepository<TEntity>(IAmazonDynamoDB _dynamoDb) : IGenericRep
 
         QueryResponse response = await _dynamoDb.QueryAsync(queryRequest);
 
-        return response.Items.Select(attributeValueToEntity).ToArray()!;
+        return response.Items.Select(attributeValuesToEntity).ToArray()!;
+    }
+
+    public async Task<PageResult<TEntity>> GetPagedItems(PageQuery pageQuery)
+    {
+        var expressionAttributeValues = new Dictionary<string, AttributeValue>
+        {
+            { ":v_Pk", new AttributeValue(pageQuery.PartitionKey) }
+        };
+
+        Dictionary<string, AttributeValue>? exclusiveStartKey = continuationTokenToExclusiveStartKey(pageQuery.ContinuationToken);
+
+        var queryRequest = new QueryRequest
+        {
+            TableName                 = TEntity.TableName,
+            KeyConditionExpression    = "pk = :v_Pk",
+            ExpressionAttributeValues = expressionAttributeValues,
+            Limit                     = pageQuery.PageSize,
+            ExclusiveStartKey         = exclusiveStartKey,
+            // The default value is true, representing Ascendant order. If you use "sk" as Ulid text or an Ulid-generated GUID, it can be ordered
+            // ScanIndexForward          = false
+        };
+
+        QueryResponse response = await _dynamoDb.QueryAsync(queryRequest);
+
+        if (response.Items.Count == 0)
+        {
+            return PageResult<TEntity>.Empty;
+        }
+
+        string? continuationToken = lastEvaluatedKeyToContinuationToken(response.LastEvaluatedKey);
+
+        List<TEntity> items = response.Items.Select(attributeValuesToEntity).ToList()!;
+
+        return new PageResult<TEntity>(items, continuationToken);
     }
 
     public async Task<TEntity[]> GetItemsUsingIndex(string partitionKey, string lsiKey)
@@ -84,7 +119,7 @@ public class GenericRepository<TEntity>(IAmazonDynamoDB _dynamoDb) : IGenericRep
 
         QueryResponse response = await _dynamoDb.QueryAsync(queryRequest);
 
-        return response.Items.Select(attributeValueToEntity).ToArray()!;
+        return response.Items.Select(attributeValuesToEntity).ToArray()!;
     }
 
     public async Task<TEntity[]> GetItemsBySortKeyPrefix(string partitionKey, string sortKeyPrefix)
@@ -107,24 +142,24 @@ public class GenericRepository<TEntity>(IAmazonDynamoDB _dynamoDb) : IGenericRep
 
         QueryResponse response = await _dynamoDb.QueryAsync(queryRequest);
 
-        return response.Items.Select(attributeValueToEntity).ToArray()!;
+        return response.Items.Select(attributeValuesToEntity).ToArray()!;
     }
 
-    public async Task<TEntity[]> GetItemsByScaning()
+    public async Task<TEntity[]> GetItemsByScanning()
     {
         // The scan operation is not recommended because it requires a large amount of resources due to the nature of scanning all partitions
-        // TODO: Use pagination with Limit and LastEvaluatedKey as in CountItems method
+        // TODO: Use pagination with Limit and LastEvaluatedKey as in GetPagedItems method
         var scanRequest = new ScanRequest(TEntity.TableName);
 
         ScanResponse response = await _dynamoDb.ScanAsync(scanRequest);
 
-        return response.Items.Select(attributeValueToEntity).ToArray()!;
+        return response.Items.Select(attributeValuesToEntity).ToArray()!;
     }
 
-    public async Task<List<(string PartitionKey, string SortKey)>> GetKeysByScaning()
+    public async Task<List<(string PartitionKey, string SortKey)>> GetKeysByScanning()
     {
         // The scan operation is not recommended because it requires a large amount of resources due to the nature of scanning all partitions
-        // TODO: Use pagination with Limit and LastEvaluatedKey as in CountItems method
+        // TODO: Use pagination with Limit and LastEvaluatedKey as in GetPagedItems method
         var scanRequest = new ScanRequest(TEntity.TableName) { ProjectionExpression = "pk, sk" };
 
         ScanResponse response = await _dynamoDb.ScanAsync(scanRequest);
@@ -223,7 +258,7 @@ public class GenericRepository<TEntity>(IAmazonDynamoDB _dynamoDb) : IGenericRep
         return Document.FromJson(serializedEntity).ToAttributeMap();
     }
 
-    protected static TEntity? attributeValueToEntity(Dictionary<string, AttributeValue>? attributeValues)
+    protected static TEntity? attributeValuesToEntity(Dictionary<string, AttributeValue>? attributeValues)
     {
         if (attributeValues is null || attributeValues.Count == 0)
         {
@@ -233,5 +268,19 @@ public class GenericRepository<TEntity>(IAmazonDynamoDB _dynamoDb) : IGenericRep
         Document document = Document.FromAttributeMap(attributeValues);
 
         return JsonSerializer.Deserialize<TEntity>(document.ToJson());
+    }
+
+    private static Dictionary<string, AttributeValue>? continuationTokenToExclusiveStartKey(string? continuationToken)
+    {
+        return string.IsNullOrEmpty(continuationToken)
+            ? null
+            : JsonSerializer.Deserialize<Dictionary<string, AttributeValue>>(Convert.FromBase64String(continuationToken));
+    }
+
+    private static string? lastEvaluatedKeyToContinuationToken(Dictionary<string, AttributeValue>? lastEvaluatedKey)
+    {
+        return lastEvaluatedKey is null
+            ? null
+            : Convert.ToBase64String(JsonSerializer.SerializeToUtf8Bytes(lastEvaluatedKey));
     }
 }
